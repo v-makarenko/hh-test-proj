@@ -33,21 +33,40 @@ public class ArticleTask implements Runnable {
     public void run() {
         final String baseUrl = url.split("/wiki")[0];
         Document root = null;
+        Article article = null;
         try {
-            root = Jsoup.connect(url).get();
+            if (!Storage.INSTANCE.getStorage().containsKey(url)) {
+//                synchronized (Storage.INSTANCE.getStorage()) {
+//                    if (!Storage.INSTANCE.getStorage().containsKey(url)) {
+                // we still can havesome duplicates but we are not reducing performance too hard
+                root = Jsoup.connect(url).get();
+                String text = root
+                        .select("#mw-content-text p")
+                        .stream()
+                        .map(Element::text)
+                        .collect(Collectors.joining("\n")); // load all the text
+                String name = root.getElementById("firstHeading").text();
+                article = new Article(name, text, root.outerHtml());
+                Storage.INSTANCE.getStorage().put(url, article);
+                LOG.debug("Loaded {} article", article.getName());
+//                    }
+//                }
+                if (article != null) {
+                    Storage.INSTANCE.addIndex(article);
+                    LOG.debug("Indexed {} article", article.getName());
+                }
+            }
         } catch (IOException e) {
             LOG.error("Problem loading {}", url);
             loader.getTasksLeft().decrementAndGet();
             return;
         }
-        String text = root
-                .select("#mw-content-text p")
-                .stream()
-                .map(Element::text)
-                .collect(Collectors.joining("\n")); // load all the text
+        if (article == null) {
+            article = Storage.INSTANCE.getStorage().get(url);
+            root = Jsoup.parse(article.getHtml());
+        }
 
-        String name = root.getElementById("firstHeading").text();
-        Article article = new Article(name, text);
+
         if (depth != 0) {
             root.select("#mw-content-text p > a").forEach(link ->
             {
@@ -63,11 +82,6 @@ public class ArticleTask implements Runnable {
             });
         }
 
-        Storage.INSTANCE.getStorage().put(url, article);
-        LOG.debug("Loaded {} article", name);
-
-        Storage.INSTANCE.addIndex(article);
-        LOG.debug("Indexed {} article", name);
 
         loader.getTasksLeft().decrementAndGet();
     }

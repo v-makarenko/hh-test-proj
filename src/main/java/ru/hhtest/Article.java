@@ -6,10 +6,12 @@ package ru.hhtest;
 public class Article {
     final private String name;
     final private String text;
+    final private String html;
 
-    public Article(String name, String text) {
+    public Article(String name, String text,String html) {
         this.name = name;
         this.text = text;
+        this.html = html;
     }
 
     public String getName() {
@@ -18,5 +20,9 @@ public class Article {
 
     public String getText() {
         return text;
+    }
+
+    public String getHtml() {
+        return html;
     }
 }
